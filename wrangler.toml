@@ -1,4 +1,0 @@
-# 强制指定静态产物目录为 out
-pages_build_output_dir = "out"
-# 项目名随便填，不影响打包
-name = "work2-metanode-stake-demo"
