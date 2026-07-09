@@ -1,6 +1,35 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useAccount } from 'wagmi'
+import { useAccount, useChainId } from 'wagmi'
+
+// 常见链的区块浏览器映射
+const CHAIN_EXPLORERS: Record<number, { name: string; url: string }> = {
+  1:        { name: 'Etherscan',   url: 'https://etherscan.io' },
+  5:        { name: 'Etherscan',   url: 'https://goerli.etherscan.io' },
+  11155111: { name: 'Etherscan',   url: 'https://sepolia.etherscan.io' },
+  17000:    { name: 'Etherscan',   url: 'https://holesky.etherscan.io' },
+  137:      { name: 'Polygonscan', url: 'https://polygonscan.com' },
+  80001:    { name: 'Polygonscan', url: 'https://mumbai.polygonscan.com' },
+  56:       { name: 'BscScan',     url: 'https://bscscan.com' },
+  97:       { name: 'BscScan',     url: 'https://testnet.bscscan.com' },
+  42161:    { name: 'Arbiscan',    url: 'https://arbiscan.io' },
+  421614:   { name: 'Arbiscan',    url: 'https://sepolia.arbiscan.io' },
+  10:       { name: 'Etherscan',   url: 'https://optimistic.etherscan.io' },
+  11155420: { name: 'Etherscan',   url: 'https://sepolia-optimism.etherscan.io' },
+  8453:     { name: 'Basescan',    url: 'https://basescan.org' },
+  84532:    { name: 'Basescan',    url: 'https://sepolia.basescan.org' },
+  43114:    { name: 'Snowtrace',   url: 'https://snowtrace.io' },
+  43113:    { name: 'Snowtrace',   url: 'https://testnet.snowtrace.io' },
+}
+
+function getExplorerUrl(chainId: number, txHash: string): { name: string; url: string } {
+  const explorer = CHAIN_EXPLORERS[chainId]
+  if (explorer) {
+    return { name: explorer.name, url: `${explorer.url}/tx/${txHash}` }
+  }
+  // 未知链回退到 etherscan（主网）
+  return { name: 'Etherscan', url: `https://etherscan.io/tx/${txHash}` }
+}
 import { useStakeContract } from '../hooks/useStakeContract'
 import { getAddress } from 'viem'
 
@@ -9,6 +38,7 @@ export default function StakePage() {
   const [stakeValue, setStakeValue] = useState('')
 
   const {address,isConnected} = useAccount()
+  const chainId = useChainId()
 
 const {
     stakedEth,
@@ -113,15 +143,18 @@ const {
           </button>
         </div>
         {txStatus && (
-          <section style={{ marginTop: 16 }}>
+          <section style={{ marginTop: 16,color:'white' }}>
             <div><strong>交易状态：</strong> {txStatus}</div>
-            {txHash && (
-              <div style={{ marginTop: 6 }}>
-                <a href={`https://etherscan.io/tx/${txHash}`} target="_blank" rel="noreferrer">
-                  查看交易（Etherscan）
-                </a>
-              </div>
-            )}
+            {txHash && (() => {
+              const explorer = getExplorerUrl(chainId, txHash)
+              return (
+                <div style={{ marginTop: 6 }}>
+                  <a href={explorer.url} target="_blank" rel="noreferrer">
+                    查看交易（{explorer.name}）
+                  </a>
+                </div>
+              )
+            })()}
           </section>
         )}
       </div>

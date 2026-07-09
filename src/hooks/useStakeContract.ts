@@ -23,6 +23,9 @@ export function useStakeContract() {
   const [pendingWithdrawWei, setPendingWithdrawWei] = useState<bigint>(BigInt(0));
   const [loadingReads, setLoadingReads] = useState(false);
   const [balanceWei, setBalanceWei] = useState<bigint>(BigInt(0));
+  const [unstakeLockedBlocks, setUnstakeLockedBlocks] = useState<bigint>(BigInt(0));
+  const [cooldownSeconds, setCooldownSeconds] = useState<number | null>(null);
+  const [avgBlockTime, setAvgBlockTime] = useState<number>(12); // 默认12秒，ETH主网的平均区块时间
 
 
 
@@ -35,6 +38,8 @@ const fetchReads = useCallback(async () => {
     setRequestAmountWei(BigInt(0));
     setPendingWithdrawWei(BigInt(0));
     setBalanceWei(BigInt(0));
+    setUnstakeLockedBlocks(BigInt(0));
+    setCooldownSeconds(null);
     return;
   }
 
@@ -67,6 +72,65 @@ const fetchReads = useCallback(async () => {
       });
 
       const stakedBn: bigint = BigInt(staked ?? BigInt(0));
+
+      // 读取 pool 信息以获取 unstakeLockedBlocks
+      try {
+        const poolRes = await publicClient.readContract({
+          address: CONTRACT_ADDRESS,
+          abi: STAKE_ABI,
+          functionName: "pool",
+          args: [BigInt(ETH_PID)],
+        });
+        let ulb = BigInt(0);
+        try {
+          if (Array.isArray(poolRes)) {
+            ulb = BigInt(poolRes[6] ?? BigInt(0));
+          } else if (poolRes && typeof poolRes === "object" && "unstakeLockedBlocks" in (poolRes as any)) {
+            ulb = BigInt((poolRes as any).unstakeLockedBlocks ?? BigInt(0));
+          } else if (poolRes && typeof poolRes === "object" && "6" in (poolRes as any)) {
+            ulb = BigInt((poolRes as any)[6] ?? BigInt(0));
+          }
+        } catch (e) {
+          ulb = BigInt(0);
+        }
+        console.log("useStakeContract poolRes:", poolRes, "unstakeLockedBlocks:", ulb.toString());
+        setUnstakeLockedBlocks(ulb);
+
+        // 估算平均区块时间（使用最近 10 个区块差值）
+        try {
+          const latestNumber = await publicClient.getBlockNumber();
+          const window = Math.min(10, Math.max(1, Number(latestNumber)));
+          const prevNumber = Math.max(0, Number(latestNumber) - window);
+          const latestBlock = await publicClient.getBlock({ blockNumber: BigInt(latestNumber) });
+          const prevBlock = await publicClient.getBlock({ blockNumber: BigInt(prevNumber) });
+          const latestTs = Number((latestBlock as any)?.timestamp ?? 0);
+          const prevTs = Number((prevBlock as any)?.timestamp ?? 0);
+          const latestNumberNum = Number(latestNumber);
+          const avgBlockTime = (latestTs && prevTs && latestNumberNum - prevNumber > 0)
+            ? (latestTs - prevTs) / (latestNumberNum - prevNumber)
+            : 1;
+          const cooldown = Number(ulb) * Math.max(avgBlockTime, 1);
+          console.log("useStakeContract cooldown calc:", {
+            latestNumber: latestNumber.toString(),
+            prevNumber,
+            latestTs,
+            prevTs,
+            avgBlockTime,
+            unstakeLockedBlocks: ulb.toString(),
+            cooldownSeconds: cooldown,
+          });
+          setCooldownSeconds(cooldown);
+          setAvgBlockTime(avgBlockTime);
+        } catch (e) {
+          console.error("useStakeContract cooldown calc error", e);
+          setCooldownSeconds(null);
+          setAvgBlockTime(12);
+        }
+      } catch (e) {
+        setUnstakeLockedBlocks(BigInt(0));
+        setCooldownSeconds(null);
+        setAvgBlockTime(12);
+      }
 
       // 解析 withdraw 返回（兼容 tuple / object）
       let reqBn = BigInt(0);
@@ -224,6 +288,9 @@ fetchRef.current = fetchReads;
     pendingWithdrawWei,
     processingWei,
     balanceWei,
+    unstakeLockedBlocks,
+    cooldownSeconds,
+    avgBlockTime,
     // formatted strings
     stakedEth,
     requestAmountEth,
