@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useAccount, useChainId } from 'wagmi'
+import { useSignature } from '../hooks/useSignature'
 
 // 常见链的区块浏览器映射
 const CHAIN_EXPLORERS: Record<number, { name: string; url: string }> = {
@@ -36,9 +37,11 @@ import { getAddress } from 'viem'
 export default function StakePage() {
   // 质押输入金额
   const [stakeValue, setStakeValue] = useState('')
+  const [enableSignConfirm, setEnableSignConfirm] = useState(true) // 是否启用签名确认
 
   const {address,isConnected} = useAccount()
   const chainId = useChainId()
+  const { sign, loading: signLoading, error: signError } = useSignature()
 
 const {
     stakedEth,
@@ -60,6 +63,17 @@ const {
     if (!stakeValue || isNaN(parsed) || parsed <= 0) {
       alert("请输入大于 0 的质押数量（ETH）");
       return;
+    }
+
+    // 签名确认（可选）
+    if (enableSignConfirm) {
+      const confirmMessage = `确认质押 ${stakeValue} ETH 到 MetaNode 质押合约`;
+      const signature = await sign(confirmMessage);
+      if (!signature) {
+        // 签名失败或被拒绝
+        return;
+      }
+      console.log('签名确认成功:', signature);
     }
 
     setIsSubmitting(true);
@@ -88,7 +102,7 @@ const {
       // 保留 txStatus/txHash 以便用户点击查看或页面刷新
     }
   };
-  
+
   return (
     <div className="min-h-screen bg-slate-900 bg-[linear-gradient(#222831_1px,transparent_1px),linear-gradient(90deg,#222831_1px,transparent_1px)] bg-[size:24px_24px] py-10 px-4">
       <div className="max-w-xl mx-auto">
@@ -136,10 +150,47 @@ const {
             <p className="text-gray-500 text-sm">可用余额：{balanceEth}</p>
           </div>
 
+          {/* 签名确认选项 */}
+          <div className="mb-6 flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="signConfirm"
+              checked={enableSignConfirm}
+              onChange={(e) => setEnableSignConfirm(e.target.checked)}
+              className="w-4 h-4 rounded border-slate-600 bg-slate-900 text-yellow-500 focus:ring-yellow-400"
+            />
+            <label htmlFor="signConfirm" className="text-gray-400 text-sm">
+              启用签名确认（增加安全性）
+            </label>
+          </div>
+
+          {/* 签名错误提示 */}
+          {signError && (
+            <div className="mb-4 p-3 bg-red-900/50 border border-red-700 rounded-md">
+              <p className="text-red-300 text-sm">{signError}</p>
+            </div>
+          )}
+
           {/* 质押按钮 */}
-          <button className="w-full bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold py-4 rounded-md text-lg transition-all flex items-center justify-center gap-3" onClick={onDeposit} disabled={!isConnected || isSubmitting}>
-            <span>↓</span>
-            质押 ETH
+          <button
+            className="w-full bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold py-4 rounded-md text-lg transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={onDeposit}
+            disabled={!isConnected || isSubmitting || signLoading}
+          >
+            {signLoading ? (
+              <>
+                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                签名确认中...
+              </>
+            ) : (
+              <>
+                <span>↓</span>
+                质押 ETH
+              </>
+            )}
           </button>
         </div>
         {txStatus && (

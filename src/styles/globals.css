@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import '@wkrjwlt/walletkit/styles.css';
+
 html,
 body {
   padding: 0;

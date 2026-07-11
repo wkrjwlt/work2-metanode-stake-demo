@@ -1,3 +1,4 @@
+/** @type {import('postcss').AcceptedPlugin} */
 const config = {
   plugins: {
     "@tailwindcss/postcss": {},
