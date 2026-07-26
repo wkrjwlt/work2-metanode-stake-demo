@@ -37,7 +37,7 @@ import { getAddress } from 'viem'
 export default function StakePage() {
   // 质押输入金额
   const [stakeValue, setStakeValue] = useState('')
-  const [enableSignConfirm, setEnableSignConfirm] = useState(true) // 是否启用签名确认
+  const [enableSignConfirm, setEnableSignConfirm] = useState(false) // 是否启用签名确认
 
   const {address,isConnected} = useAccount()
   const chainId = useChainId()
@@ -82,10 +82,15 @@ const {
 
     try {
       await depositETH(stakeValue, (status, info) => {
-        // status: sending | sent | confirmed | error
+        // status: sending | sent | replaced | confirmed | error
         setTxStatus(status);
         if (status === "sent" && info?.hash) {
           setTxHash(info.hash);
+        }
+        if (status === "replaced" && info?.newHash) {
+          // 交易被加速/替换，更新 hash
+          setTxHash(info.newHash);
+          console.log(`交易已加速: ${info.oldHash} -> ${info.newHash}`);
         }
         if (status === "confirmed") {
           // 在确认后可以清理输入并提示
@@ -151,7 +156,7 @@ const {
           </div>
 
           {/* 签名确认选项 */}
-          <div className="mb-6 flex items-center gap-2">
+          {/* <div className="mb-6 flex items-center gap-2">
             <input
               type="checkbox"
               id="signConfirm"
@@ -162,7 +167,7 @@ const {
             <label htmlFor="signConfirm" className="text-gray-400 text-sm">
               启用签名确认（增加安全性）
             </label>
-          </div>
+          </div> */}
 
           {/* 签名错误提示 */}
           {signError && (

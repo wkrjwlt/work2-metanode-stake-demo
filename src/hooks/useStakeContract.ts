@@ -190,21 +190,51 @@ fetchRef.current = fetchReads;
 
   // ---------- 写操作 ----------
   // 所有写操作在执行前都要确保 walletClient 可用
+
+  // 🔴 测试模式开关：设置为 true 可以让交易卡在内存池，方便测试"加速"功能
+  // 测试完成后记得改回 false 或删除相关代码
+  const TEST_LOW_GAS_MODE = false;
+
   async function depositETH(amountEth: string, onStatus?: (status: string, info?: any) => void) {
     if (!walletClient) throw new Error("Wallet client not available");
     if (!publicClient) throw new Error("Public client not available");
     const value = parseEther(amountEth);
     try {
       onStatus?.("sending");
-      // walletClient.writeContract 在你的版本上可能需要 as any 来绕开类型不完全匹配
-      const hash = await walletClient.writeContract({
+
+      // 构建交易参数
+      const txParams: any = {
         abi: STAKE_ABI,
         address: CONTRACT_ADDRESS,
         functionName: "depositETH",
         value,
-      });
+      };
+
+      // 🔴 测试模式：设置极低的 gas price，让交易在内存池中等待
+      if (TEST_LOW_GAS_MODE) {
+        // Sepolia 当前 gas price 约 1-2 Gwei，我们设置 0.1 Gwei 让它卡住
+        txParams.gasPrice = BigInt(100_000_000); // 0.1 Gwei（极低）
+        console.log('⚠️ 测试模式：低 Gas 已启用，交易会在内存池等待');
+      }
+
+      const hash = await walletClient.writeContract(txParams);
       onStatus?.("sent", { hash });
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash,
+        timeout: 120_000, // 延长超时到 2 分钟，方便测试
+        onReplaced: (replacement) => {
+          console.log('✅ onReplaced 被触发了！');
+          console.log('替换原因:', replacement.reason); // 'repriced' | 'cancelled' | 'replaced'
+          console.log('原 hash:', hash);
+          console.log('新 hash:', replacement.transaction?.hash);
+          console.log('完整 replacement 对象:', replacement);
+          onStatus?.("replaced", {
+            reason: replacement.reason,
+            newHash: replacement.transaction?.hash,
+            oldHash: hash
+          });
+        }
+      });
       onStatus?.("confirmed", { receipt });
       await fetchReads();
       return { hash, receipt };
@@ -227,7 +257,22 @@ fetchRef.current = fetchReads;
         args: [BigInt(ETH_PID), amount],
       });
       onStatus?.("sent", { hash });
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash,
+        timeout: 120_000, // 延长超时到 2 分钟，方便测试
+        onReplaced: (replacement) => {
+          console.log('✅ onReplaced 被触发了！');
+          console.log('替换原因:', replacement.reason); // 'repriced' | 'cancelled' | 'replaced'
+          console.log('原 hash:', hash);
+          console.log('新 hash:', replacement.transaction?.hash);
+          console.log('完整 replacement 对象:', replacement);
+          onStatus?.("replaced", {
+            reason: replacement.reason,
+            newHash: replacement.transaction?.hash,
+            oldHash: hash
+          });
+        }
+      });
       onStatus?.("confirmed", { receipt });
       await fetchReads();
       return { hash, receipt };
@@ -249,7 +294,22 @@ fetchRef.current = fetchReads;
         args: [BigInt(ETH_PID)],
       });
       onStatus?.("sent", { hash });
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash,
+        timeout: 120_000, // 延长超时到 2 分钟，方便测试
+        onReplaced: (replacement) => {
+          console.log('✅ onReplaced 被触发了！');
+          console.log('替换原因:', replacement.reason); // 'repriced' | 'cancelled' | 'replaced'
+          console.log('原 hash:', hash);
+          console.log('新 hash:', replacement.transaction?.hash);
+          console.log('完整 replacement 对象:', replacement);
+          onStatus?.("replaced", {
+            reason: replacement.reason,
+            newHash: replacement.transaction?.hash,
+            oldHash: hash
+          });
+        }
+      });
       onStatus?.("confirmed", { receipt });
       await fetchReads();
       return { hash, receipt };
@@ -271,7 +331,22 @@ fetchRef.current = fetchReads;
         args: [BigInt(ETH_PID)],
       });
       onStatus?.("sent", { hash });
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash,
+        timeout: 120_000, // 延长超时到 2 分钟，方便测试
+        onReplaced: (replacement) => {
+          console.log('✅ onReplaced 被触发了！');
+          console.log('替换原因:', replacement.reason); // 'repriced' | 'cancelled' | 'replaced'
+          console.log('原 hash:', hash);
+          console.log('新 hash:', replacement.transaction?.hash);
+          console.log('完整 replacement 对象:', replacement);
+          onStatus?.("replaced", {
+            reason: replacement.reason,
+            newHash: replacement.transaction?.hash,
+            oldHash: hash
+          });
+        }
+      });
       onStatus?.("confirmed", { receipt });
       await fetchReads();
       return { hash, receipt };

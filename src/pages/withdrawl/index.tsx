@@ -66,6 +66,11 @@ export default function WithdrawPage() {
       await unstake(unstakeAmount, (status, info) => {
         setTxStatus(status);
         if (status === "sent" && info?.hash) setTxHash(info.hash);
+        if (status === "replaced" && info?.newHash) {
+          // 交易被加速/替换，更新 hash
+          setTxHash(info.newHash);
+          console.log(`交易已加速: ${info.oldHash} -> ${info.newHash}`);
+        }
         if (status === "confirmed") {
           // 清空输入并提示
           setTimeout(() => setUnstakeAmount(""), 300);
