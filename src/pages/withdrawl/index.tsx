@@ -1,11 +1,11 @@
 'use client'
 import { useEffect, useState } from 'react'
 import CardBox from './components/CardBox'
-import { useAccount } from 'wagmi';
+import { useWallet } from '@wkrjwlt/walletkit';
 import { useStakeContract } from '../../hooks/useStakeContract';
 
 export default function WithdrawPage() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useWallet();
   const {
     stakedEth,
     requestAmountEth,

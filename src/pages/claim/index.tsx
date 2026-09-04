@@ -1,12 +1,12 @@
 'use client'
 import { useState } from 'react'
 import CardBox from '../withdrawl/components/CardBox';
-import { useAccount } from 'wagmi';
+import { useWallet } from '@wkrjwlt/walletkit';
 import { useStakeContract } from '../../hooks/useStakeContract';
 import { useStakeClaimReward } from '../../hooks/useStakeClaimReward';
 
 export default function ClaimPage({pid = 0}) {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useWallet();
   const {
     stakedEth,
     loadingReads,

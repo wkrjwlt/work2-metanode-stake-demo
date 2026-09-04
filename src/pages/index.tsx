@@ -1,6 +1,6 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { useAccount, useChainId } from 'wagmi'
+import { useState } from 'react'
+import { useWallet } from '@wkrjwlt/walletkit'
 import { useSignature } from '../hooks/useSignature'
 
 // 常见链的区块浏览器映射
@@ -39,8 +39,7 @@ export default function StakePage() {
   const [stakeValue, setStakeValue] = useState('')
   const [enableSignConfirm, setEnableSignConfirm] = useState(false) // 是否启用签名确认
 
-  const {address,isConnected} = useAccount()
-  const chainId = useChainId()
+  const {address, isConnected, chainId} = useWallet()
   const { sign, loading: signLoading, error: signError } = useSignature()
 
 const {

@@ -1,8 +1,10 @@
 // src/hooks/useStakeContract.ts
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useAccount, usePublicClient, useWalletClient, useBlockNumber } from "wagmi";
-import { parseEther, formatEther } from "viem";
+import { useAccount, usePublicClient, useWalletClient as useWagmiWalletClient } from "wagmi";
+import { useWallet } from "@wkrjwlt/walletkit";
+import { parseEther, formatEther, createPublicClient, createWalletClient, custom, http } from "viem";
 import { CONTRACT_ADDRESS, STAKE_ABI, ETH_PID } from "../assets/abis/stake";
+import { sepolia } from "wagmi/chains";
 
 /**
  * useStakeContract - 读取 + 写入封装
@@ -11,12 +13,44 @@ import { CONTRACT_ADDRESS, STAKE_ABI, ETH_PID } from "../assets/abis/stake";
  * - 在调用 publicClient / walletClient 前做存在性检查，避免 "possibly undefined" 报错
  */
 export function useStakeContract() {
-  const { address, isConnected } = useAccount();
+  // 同时从 wagmi 和 walletkit 获取地址
+  const { address: wagmiAddress, isConnected: wagmiIsConnected } = useAccount();
+  const { address: wltAddress, isConnected: wltIsConnected, chainId: wltChainId } = useWallet();
+
+  // 合并地址：wagmi 或 WLT
+  const address = wagmiAddress || wltAddress;
+  const isConnected = wagmiIsConnected || wltIsConnected;
 
   // 可能为 undefined，需在使用前校验
-  const publicClient = usePublicClient(); // 只读 client（viem client）
-  const {data:walletClient} = useWalletClient(); // 钱包签名 client（用于写交易）
-  const block = useBlockNumber({ watch: false });
+  const wagmiPublicClient = usePublicClient(); // wagmi 的 client（默认 mainnet）
+
+  // 对于 WLT 钱包，用 useMemo 同步创建 Sepolia 的 publicClient
+  const sepoliaClient = useMemo(() => {
+    if (wltAddress && wltChainId === 11155111) {
+      return createPublicClient({
+        chain: sepolia,
+        transport: http('https://ethereum-sepolia-rpc.publicnode.com'),
+      });
+    }
+    return null;
+  }, [wltAddress, wltChainId]);
+
+  // 选择正确的 publicClient
+  const publicClient = wltAddress ? (sepoliaClient || wagmiPublicClient) : wagmiPublicClient;
+
+  // 选择正确的 walletClient：WLT 钱包需要自己创建，wagmi 的 useWalletClient 不认识它
+  const { data: wagmiWalletClient } = useWagmiWalletClient();
+  const wltWalletClient = useMemo(() => {
+    if (wltAddress && (window as any).wltwallet) {
+      return createWalletClient({
+        account: wltAddress as `0x${string}`,
+        chain: sepolia,
+        transport: custom((window as any).wltwallet),
+      });
+    }
+    return null;
+  }, [wltAddress]);
+  const walletClient = wltWalletClient || wagmiWalletClient;
 
   const [stakedWei, setStakedWei] = useState<bigint>(BigInt(0));
   const [requestAmountWei, setRequestAmountWei] = useState<bigint>(BigInt(0));
@@ -26,20 +60,25 @@ export function useStakeContract() {
   const [unstakeLockedBlocks, setUnstakeLockedBlocks] = useState<bigint>(BigInt(0));
   const [cooldownSeconds, setCooldownSeconds] = useState<number | null>(null);
   const [avgBlockTime, setAvgBlockTime] = useState<number>(12); // 默认12秒，ETH主网的平均区块时间
+  // 请求 ID：防止旧请求覆盖新数据
+  const fetchIdRef = useRef(0);
 
 
 
 const fetchReads = useCallback(async () => {
-  // 正在加载中直接退出，防止并发重复请求
-  if (loadingReads) return;
+  const thisFetchId = ++fetchIdRef.current;
+
+  const setIfLatest = <T>(setter: React.Dispatch<React.SetStateAction<T>>, value: T) => {
+    if (fetchIdRef.current === thisFetchId) setter(value);
+  };
 
   if (!publicClient || !address) {
-    setStakedWei(BigInt(0));
-    setRequestAmountWei(BigInt(0));
-    setPendingWithdrawWei(BigInt(0));
-    setBalanceWei(BigInt(0));
-    setUnstakeLockedBlocks(BigInt(0));
-    setCooldownSeconds(null);
+    setIfLatest(setStakedWei, BigInt(0));
+    setIfLatest(setRequestAmountWei, BigInt(0));
+    setIfLatest(setPendingWithdrawWei, BigInt(0));
+    setIfLatest(setBalanceWei, BigInt(0));
+    setIfLatest(setUnstakeLockedBlocks, BigInt(0));
+    setIfLatest(setCooldownSeconds, null);
     return;
   }
 
@@ -48,22 +87,29 @@ const fetchReads = useCallback(async () => {
       // 1. 获取钱包原生ETH余额
       let userBalance = BigInt(0);
       try {
-        userBalance = await publicClient.getBalance({ address });
+        if (wltAddress && wltChainId === 11155111) {
+          const rpcRes = await fetch('https://ethereum-sepolia-rpc.publicnode.com', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_getBalance', params: [address, 'latest'], id: 1 }),
+          });
+          const rpcData = await rpcRes.json();
+          userBalance = BigInt(rpcData.result || '0x0');
+        } else {
+          userBalance = await publicClient.getBalance({ address });
+        }
       } catch (e) {
+        console.error('[fetchReads] getBalance error:', e);
         userBalance = BigInt(0);
       }
-      setBalanceWei(userBalance);
-      // 读取 stakingBalance
-      console.log("调用参数 pid:", ETH_PID, "user:", address,"CONTRACT_ADDRESS：",CONTRACT_ADDRESS)
+      setIfLatest(setBalanceWei, userBalance);
       const staked = await publicClient.readContract({
         address: CONTRACT_ADDRESS,
         abi: STAKE_ABI,
         functionName: "stakingBalance",
         args: [BigInt(ETH_PID), address],
       });
-      console.log('执行了stakingBalance----',staked);
-      
-      // 读取 withdrawAmount
+
       const withdrawRes = await publicClient.readContract({
         address: CONTRACT_ADDRESS,
         abi: STAKE_ABI,
@@ -93,8 +139,7 @@ const fetchReads = useCallback(async () => {
         } catch (e) {
           ulb = BigInt(0);
         }
-        console.log("useStakeContract poolRes:", poolRes, "unstakeLockedBlocks:", ulb.toString());
-        setUnstakeLockedBlocks(ulb);
+        setIfLatest(setUnstakeLockedBlocks, ulb);
 
         // 估算平均区块时间（使用最近 10 个区块差值）
         try {
@@ -110,26 +155,17 @@ const fetchReads = useCallback(async () => {
             ? (latestTs - prevTs) / (latestNumberNum - prevNumber)
             : 1;
           const cooldown = Number(ulb) * Math.max(avgBlockTime, 1);
-          console.log("useStakeContract cooldown calc:", {
-            latestNumber: latestNumber.toString(),
-            prevNumber,
-            latestTs,
-            prevTs,
-            avgBlockTime,
-            unstakeLockedBlocks: ulb.toString(),
-            cooldownSeconds: cooldown,
-          });
-          setCooldownSeconds(cooldown);
-          setAvgBlockTime(avgBlockTime);
+          setIfLatest(setCooldownSeconds, cooldown);
+          setIfLatest(setAvgBlockTime, avgBlockTime);
         } catch (e) {
           console.error("useStakeContract cooldown calc error", e);
-          setCooldownSeconds(null);
-          setAvgBlockTime(12);
+          setIfLatest(setCooldownSeconds, null);
+          setIfLatest(setAvgBlockTime, 12);
         }
       } catch (e) {
-        setUnstakeLockedBlocks(BigInt(0));
-        setCooldownSeconds(null);
-        setAvgBlockTime(12);
+        setIfLatest(setUnstakeLockedBlocks, BigInt(0));
+        setIfLatest(setCooldownSeconds, null);
+        setIfLatest(setAvgBlockTime, 12);
       }
 
       // 解析 withdraw 返回（兼容 tuple / object）
@@ -151,9 +187,9 @@ const fetchReads = useCallback(async () => {
         pendingBn = BigInt(0);
       }
 
-      setStakedWei(stakedBn);
-      setRequestAmountWei(reqBn);
-      setPendingWithdrawWei(pendingBn);
+      setIfLatest(setStakedWei, stakedBn);
+      setIfLatest(setRequestAmountWei, reqBn);
+      setIfLatest(setPendingWithdrawWei, pendingBn);
     } catch (err: any) {
       // 识别“返回0x空数据”的特有错误
       const isEmptyData =
@@ -161,14 +197,14 @@ const fetchReads = useCallback(async () => {
         (err && typeof err.message === "string" && err.message.includes('returned no data ("0x")'));
       if (isEmptyData) {
         // 用户无质押，直接置0，不打印报错干扰控制台
-        setStakedWei(BigInt(0));
+        setIfLatest(setStakedWei, BigInt(0));
       } else {
         console.error("fetchReads error", err);
       }
     } finally {
-      setLoadingReads(false);
+      setIfLatest(setLoadingReads, false);
     }
-}, [publicClient, address, loadingReads]);
+}, [publicClient, address, wltAddress, wltChainId]);
 
   // 缓存fetch函数，避免依赖频繁变化
 const fetchRef = useRef(fetchReads);
@@ -177,8 +213,7 @@ fetchRef.current = fetchReads;
   useEffect(() => {
     if (!publicClient || !isConnected || !address) return;
     void fetchRef.current();
-    // 依赖 publicClient 以确保当 client 从 undefined 变为可用时会重新触发
-  }, [publicClient, address, isConnected]);
+  }, [publicClient, address, isConnected, wltAddress, wltChainId]);
 
   // 格式化字符串用于 UI（formatEther 接受 bigint）
   const stakedEth = useMemo(() => formatEther(stakedWei), [stakedWei]);
