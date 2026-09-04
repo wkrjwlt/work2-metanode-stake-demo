@@ -39,7 +39,7 @@ const fetchReads = useCallback(async () => {
     setIfLatest(setPendingWithdrawWei, BigInt(0));
     setIfLatest(setBalanceWei, BigInt(0));
     setIfLatest(setUnstakeLockedBlocks, BigInt(0));
-    setIfLatest(setCooldownSeconds, null);
+    setIfLatest<number | null>(setCooldownSeconds, null);
     return;
   }
 
@@ -110,12 +110,12 @@ const fetchReads = useCallback(async () => {
           setIfLatest(setAvgBlockTime, avgBlockTime);
         } catch (e) {
           console.error("useStakeContract cooldown calc error", e);
-          setIfLatest(setCooldownSeconds, null);
+          setIfLatest<number | null>(setCooldownSeconds, null);
           setIfLatest(setAvgBlockTime, 12);
         }
       } catch (e) {
         setIfLatest(setUnstakeLockedBlocks, BigInt(0));
-        setIfLatest(setCooldownSeconds, null);
+        setIfLatest<number | null>(setCooldownSeconds, null);
         setIfLatest(setAvgBlockTime, 12);
       }
 
