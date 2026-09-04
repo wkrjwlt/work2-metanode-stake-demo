@@ -1,5 +1,6 @@
 import '../styles/globals.css';
 import type { AppProps } from 'next/app';
+import { useState } from 'react';
 import MainLayout from './mainLayout';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -8,8 +9,6 @@ import { WalletProvider } from '@wkrjwlt/walletkit';
 
 import { config } from '../wagmi';
 import WalletErrorHandler from '../components/WalletErrorHandler';
-
-const client = new QueryClient();
 
 // 自定义钱包配置
 const walletConfig = {
@@ -36,9 +35,12 @@ const walletConfig = {
 };
 
 function MyApp({ Component, pageProps }: AppProps) {
+  // QueryClient 必须在组件内部创建，避免 SSR 时的共享状态问题
+  const [queryClient] = useState(() => new QueryClient());
+
   return (
     <WagmiProvider config={config}>
-      <QueryClientProvider client={client}>
+      <QueryClientProvider client={queryClient}>
         <WalletProvider config={walletConfig}>
           <WalletErrorHandler>
             <MainLayout>

@@ -1,5 +1,6 @@
 import { createConfig, http } from 'wagmi';
 import { injected, walletConnect, coinbaseWallet } from 'wagmi/connectors';
+import { wltWallet } from '@wkrjwlt/walletkit';
 import {
   arbitrum,
   base,
@@ -30,6 +31,7 @@ export const config = createConfig({
     injected(), // MetaMask 等注入式钱包
     walletConnect({ projectId: WC_PROJECT_ID }), // WalletConnect
     coinbaseWallet({ appName: 'MetaNode Stake' }), // Coinbase Wallet
+    wltWallet, // WLT Wallet（CreateConnectorFn，不要加 ()）
   ],
   transports: {
     [mainnet.id]: http('https://eth-mainnet.g.alchemy.com/v2/qKdp3vS81JSH_Z43Q9dXi'),

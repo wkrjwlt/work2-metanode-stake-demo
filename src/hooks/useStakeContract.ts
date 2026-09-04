@@ -1,56 +1,17 @@
 // src/hooks/useStakeContract.ts
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useAccount, usePublicClient, useWalletClient as useWagmiWalletClient } from "wagmi";
-import { useWallet } from "@wkrjwlt/walletkit";
-import { parseEther, formatEther, createPublicClient, createWalletClient, custom, http } from "viem";
+import { useAccount, usePublicClient, useWalletClient } from "wagmi";
+import { parseEther, formatEther } from "viem";
 import { CONTRACT_ADDRESS, STAKE_ABI, ETH_PID } from "../assets/abis/stake";
-import { sepolia } from "wagmi/chains";
 
 /**
  * useStakeContract - 读取 + 写入封装
- * 兼容性：
- * - 避免直接使用 BigInt 字面量 (0n) —— 使用 BigInt(0) 以便在 target < ES2020 时也能通过编译
- * - 在调用 publicClient / walletClient 前做存在性检查，避免 "possibly undefined" 报错
  */
 export function useStakeContract() {
-  // 同时从 wagmi 和 walletkit 获取地址
-  const { address: wagmiAddress, isConnected: wagmiIsConnected } = useAccount();
-  const { address: wltAddress, isConnected: wltIsConnected, chainId: wltChainId } = useWallet();
-
-  // 合并地址：wagmi 或 WLT
-  const address = wagmiAddress || wltAddress;
-  const isConnected = wagmiIsConnected || wltIsConnected;
-
-  // 可能为 undefined，需在使用前校验
-  const wagmiPublicClient = usePublicClient(); // wagmi 的 client（默认 mainnet）
-
-  // 对于 WLT 钱包，用 useMemo 同步创建 Sepolia 的 publicClient
-  const sepoliaClient = useMemo(() => {
-    if (wltAddress && wltChainId === 11155111) {
-      return createPublicClient({
-        chain: sepolia,
-        transport: http('https://ethereum-sepolia-rpc.publicnode.com'),
-      });
-    }
-    return null;
-  }, [wltAddress, wltChainId]);
-
-  // 选择正确的 publicClient
-  const publicClient = wltAddress ? (sepoliaClient || wagmiPublicClient) : wagmiPublicClient;
-
-  // 选择正确的 walletClient：WLT 钱包需要自己创建，wagmi 的 useWalletClient 不认识它
-  const { data: wagmiWalletClient } = useWagmiWalletClient();
-  const wltWalletClient = useMemo(() => {
-    if (wltAddress && (window as any).wltwallet) {
-      return createWalletClient({
-        account: wltAddress as `0x${string}`,
-        chain: sepolia,
-        transport: custom((window as any).wltwallet),
-      });
-    }
-    return null;
-  }, [wltAddress]);
-  const walletClient = wltWalletClient || wagmiWalletClient;
+  // 所有钱包（MetaMask / WLT / WalletConnect）统一通过 wagmi connector 管理
+  const { address, isConnected } = useAccount();
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
 
   const [stakedWei, setStakedWei] = useState<bigint>(BigInt(0));
   const [requestAmountWei, setRequestAmountWei] = useState<bigint>(BigInt(0));
@@ -87,17 +48,7 @@ const fetchReads = useCallback(async () => {
       // 1. 获取钱包原生ETH余额
       let userBalance = BigInt(0);
       try {
-        if (wltAddress && wltChainId === 11155111) {
-          const rpcRes = await fetch('https://ethereum-sepolia-rpc.publicnode.com', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_getBalance', params: [address, 'latest'], id: 1 }),
-          });
-          const rpcData = await rpcRes.json();
-          userBalance = BigInt(rpcData.result || '0x0');
-        } else {
-          userBalance = await publicClient.getBalance({ address });
-        }
+        userBalance = await publicClient.getBalance({ address });
       } catch (e) {
         console.error('[fetchReads] getBalance error:', e);
         userBalance = BigInt(0);
@@ -204,7 +155,7 @@ const fetchReads = useCallback(async () => {
     } finally {
       setIfLatest(setLoadingReads, false);
     }
-}, [publicClient, address, wltAddress, wltChainId]);
+}, [publicClient, address, isConnected]);
 
   // 缓存fetch函数，避免依赖频繁变化
 const fetchRef = useRef(fetchReads);
@@ -213,7 +164,7 @@ fetchRef.current = fetchReads;
   useEffect(() => {
     if (!publicClient || !isConnected || !address) return;
     void fetchRef.current();
-  }, [publicClient, address, isConnected, wltAddress, wltChainId]);
+  }, [publicClient, address, isConnected]);
 
   // 格式化字符串用于 UI（formatEther 接受 bigint）
   const stakedEth = useMemo(() => formatEther(stakedWei), [stakedWei]);

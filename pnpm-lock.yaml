@@ -15,8 +15,8 @@ importers:
         specifier: ^5.55.3
         version: 5.101.2(react@19.2.7)
       '@wkrjwlt/walletkit':
-        specifier: ^0.8.0
-        version: 0.8.0(ed80b7c9deb3330017cbf4acae9354eb)
+        specifier: ^0.8.4
+        version: 0.8.4(ed80b7c9deb3330017cbf4acae9354eb)
       next:
         specifier: ^16.2.4
         version: 16.2.10(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -1544,8 +1544,8 @@ packages:
   '@walletconnect/window-metadata@1.0.1':
     resolution: {integrity: sha512-9koTqyGrM2cqFRW517BPY/iEtUDx2r1+Pwwu5m7sJ7ka79wi3EyqhqcICk/yDmv6jAS1rjKgTKXlEhanYjijcA==}
 
-  '@wkrjwlt/walletkit@0.8.0':
-    resolution: {integrity: sha512-dle0iPH3CDnUnAjKLXYeRGDZTiGeUs8FCG4VkG3ycqq8HFhhEsOqPRP1Pr22BPO1DL9VoCdwqBNuqyFbGuXHEw==}
+  '@wkrjwlt/walletkit@0.8.4':
+    resolution: {integrity: sha512-cyupbaNOVU9w/glkV0cIw0zGScyycDFY5ra/mOH6on2W1AA4F/D+qDOjVIRdl0pKuJFIAUf0IrGx60blGdznPg==}
     peerDependencies:
       '@tanstack/react-query': ^5.0.0
       react: '>=17'
@@ -6190,7 +6190,7 @@ snapshots:
       '@walletconnect/window-getters': 1.0.1
       tslib: 1.14.1
 
-  '@wkrjwlt/walletkit@0.8.0(ed80b7c9deb3330017cbf4acae9354eb)':
+  '@wkrjwlt/walletkit@0.8.4(ed80b7c9deb3330017cbf4acae9354eb)':
     dependencies:
       '@tanstack/react-query': 5.101.2(react@19.2.7)
       '@wagmi/connectors': 8.0.22(33f111294778773916546b5420755f0f)

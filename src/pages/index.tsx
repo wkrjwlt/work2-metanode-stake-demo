@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { useChainId } from 'wagmi'
 import { useWallet } from '@wkrjwlt/walletkit'
 import { useSignature } from '../hooks/useSignature'
 
@@ -39,7 +40,8 @@ export default function StakePage() {
   const [stakeValue, setStakeValue] = useState('')
   const [enableSignConfirm, setEnableSignConfirm] = useState(false) // 是否启用签名确认
 
-  const {address, isConnected, chainId} = useWallet()
+  const {address, isConnected} = useWallet()
+  const chainId = useChainId()
   const { sign, loading: signLoading, error: signError } = useSignature()
 
 const {
