@@ -166,7 +166,16 @@ const fetchRef = useRef(fetchReads);
 fetchRef.current = fetchReads;
   // 仅在 publicClient 可用、已连接并且 address 可用时触发读取，并且响应区块变化（实时）
   useEffect(() => {
-    if (!publicClient || !isConnected || !address) return;
+    if (!publicClient || !isConnected || !address) {
+      // 断开连接时清零所有数据
+      setStakedWei(BigInt(0));
+      setRequestAmountWei(BigInt(0));
+      setPendingWithdrawWei(BigInt(0));
+      setBalanceWei(BigInt(0));
+      setUnstakeLockedBlocks(BigInt(0));
+      setCooldownSeconds(null);
+      return;
+    }
     void fetchRef.current();
   }, [publicClient, address, isConnected]);
 
