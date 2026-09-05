@@ -1,4 +1,3 @@
-'use client'
 import { useState } from 'react'
 import CardBox from '../withdrawl/components/CardBox';
 import { useWallet } from '@wkrjwlt/walletkit';

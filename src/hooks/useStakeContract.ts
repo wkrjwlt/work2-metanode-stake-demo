@@ -32,6 +32,10 @@ const fetchReads = useCallback(async () => {
   const setIfLatest = <T>(setter: React.Dispatch<React.SetStateAction<T>>, value: T) => {
     if (fetchIdRef.current === thisFetchId) setter(value);
   };
+  // 辅助：当 setter 接受 number | null 而 value 是 number 时，显式标注泛型
+  const setNumberOrNull = (setter: React.Dispatch<React.SetStateAction<number | null>>, value: number | null) => {
+    if (fetchIdRef.current === thisFetchId) setter(value);
+  };
 
   if (!publicClient || !address) {
     setIfLatest(setStakedWei, BigInt(0));
@@ -39,7 +43,7 @@ const fetchReads = useCallback(async () => {
     setIfLatest(setPendingWithdrawWei, BigInt(0));
     setIfLatest(setBalanceWei, BigInt(0));
     setIfLatest(setUnstakeLockedBlocks, BigInt(0));
-    setIfLatest<number | null>(setCooldownSeconds, null);
+    setNumberOrNull(setCooldownSeconds, null);
     return;
   }
 
@@ -106,17 +110,17 @@ const fetchReads = useCallback(async () => {
             ? (latestTs - prevTs) / (latestNumberNum - prevNumber)
             : 1;
           const cooldown = Number(ulb) * Math.max(avgBlockTime, 1);
-          setIfLatest(setCooldownSeconds, cooldown);
+          setNumberOrNull(setCooldownSeconds, cooldown);
           setIfLatest(setAvgBlockTime, avgBlockTime);
         } catch (e) {
           console.error("useStakeContract cooldown calc error", e);
-          setIfLatest<number | null>(setCooldownSeconds, null);
-          setIfLatest(setAvgBlockTime, 12);
+          setNumberOrNull(setCooldownSeconds, null);
+          setIfLatest<number>(setAvgBlockTime, 12);
         }
       } catch (e) {
         setIfLatest(setUnstakeLockedBlocks, BigInt(0));
-        setIfLatest<number | null>(setCooldownSeconds, null);
-        setIfLatest(setAvgBlockTime, 12);
+        setNumberOrNull(setCooldownSeconds, null);
+        setIfLatest<number>(setAvgBlockTime, 12);
       }
 
       // 解析 withdraw 返回（兼容 tuple / object）
@@ -153,7 +157,7 @@ const fetchReads = useCallback(async () => {
         console.error("fetchReads error", err);
       }
     } finally {
-      setIfLatest(setLoadingReads, false);
+      setIfLatest<boolean>(setLoadingReads, false);
     }
 }, [publicClient, address, isConnected]);
 

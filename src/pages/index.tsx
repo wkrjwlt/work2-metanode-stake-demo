@@ -1,4 +1,3 @@
-'use client'
 import { useState } from 'react'
 import { useChainId } from 'wagmi'
 import { useWallet } from '@wkrjwlt/walletkit'
